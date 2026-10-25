@@ -75,10 +75,38 @@ void musicplayer_autosleep_lock(void) {
     autosleep_unlock(parameters_getMusicInactivityTime(), parameters_getMusicInactivityTime());
 }
 
+int musicplayer_getCurrentAlbumIndex(void) {
+    int index = musicPlayerAlbumsCount - 1;
+    for (int i = 1; i < musicPlayerAlbumsCount; i++) {
+        if (musicPlayerTrackIndex < musicPlayerAlbumsIndex[i]) {
+            index = i - 1;
+            break;
+        }
+    }
+    return index;
+}
+
+int musicplayer_getAlbumFirstTrackIndex(int albumIndex) {
+    return musicPlayerAlbumsIndex[albumIndex];
+}
+
+int musicplayer_getAlbumLastTrackIndex(int albumIndex) {
+    if (albumIndex + 1 < musicPlayerAlbumsCount) {
+        return musicPlayerAlbumsIndex[albumIndex + 1] - 1;
+    }
+    return musicPlayerTracksCount - 1;
+}
+
 void musicplayer_interfaceplayer_drawSideMusic(int index, int top) {
     int mIndex = musicPlayerTrackIndex + index;
 
-    if (mIndex < 0) {
+    if (musicPlayerRepeatMode == MUSICPLAYER_REPEAT_ALBUM) {
+        // Album view: only show the tracks of the current album, without wrapping.
+        int albumIndex = musicplayer_getCurrentAlbumIndex();
+        if (mIndex < musicplayer_getAlbumFirstTrackIndex(albumIndex) || mIndex > musicplayer_getAlbumLastTrackIndex(albumIndex)) {
+            return;
+        }
+    } else if (mIndex < 0) {
         mIndex = musicPlayerTracksCount + mIndex;
     } else if (mIndex >= musicPlayerTracksCount) {
         mIndex = mIndex - musicPlayerTracksCount;
@@ -213,17 +241,6 @@ void musicplayer_interfacealbum_draw() {
     musicplayer_interfacealbum_drawAlbum(baseIndex, 8);
     video_screenWriteFont(writePage, fontRegular16, colorWhite60, 590, 456, SDL_ALIGN_RIGHT);
     video_applyToVideo();
-}
-
-int musicplayer_getCurrentAlbumIndex(void) {
-    int index = musicPlayerAlbumsCount - 1;
-    for (int i = 1; i < musicPlayerAlbumsCount; i++) {
-        if (musicPlayerTrackIndex < musicPlayerAlbumsIndex[i]) {
-            index = i - 1;
-            break;
-        }
-    }
-    return index;
 }
 
 void musicplayer_screenUpdate(bool forceDraw) {
@@ -430,6 +447,10 @@ void musicplayer_ok(void) {
             musicplayer_interfaceplayer_drawInterface(true);
         }
     } else {
+        if (!parameters_getMusicDisableRepeatModes()) {
+            // Choosing an album opens it in album view: only its tracks are shown and played.
+            musicPlayerRepeatMode = MUSICPLAYER_REPEAT_ALBUM;
+        }
         musicPlayerMode = MUSICPLAYER_MODE_PLAYER;
         musicPlayerTrackPosition = 0.0;
         musicPlayerTrackIndex = musicPlayerAlbumsIndex[musicPlayerAlbumIndex];
